@@ -15,6 +15,40 @@ function fmtDate(d = new Date()) {
   return d.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
 }
 
+// Mirrors the pillar-completion math in useTracker.js (kept local here so
+// this module can score any historical day without needing a live hook).
+function itemRatioLocal(count, target) {
+  if (!target || target <= 0) return count > 0 ? 1 : 0
+  return Math.min(1, (count || 0) / target)
+}
+
+function pillarRatioLocal(items, counts) {
+  if (!items || items.length === 0) return 0
+  let weightSum = 0
+  let scoreSum = 0
+  for (const item of items) {
+    const w = item.target || 1
+    weightSum += w
+    scoreSum += w * itemRatioLocal(counts?.[item.id], item.target)
+  }
+  return weightSum === 0 ? 0 : scoreSum / weightSum
+}
+
+// Inclusive list of 'YYYY-MM-DD' keys from `from` to `to`.
+function dateRangeKeys(from, to) {
+  const keys = []
+  const cursor = new Date(`${from}T00:00:00`)
+  const end = new Date(`${to}T00:00:00`)
+  while (cursor <= end) {
+    const y = cursor.getFullYear()
+    const m = String(cursor.getMonth() + 1).padStart(2, '0')
+    const d = String(cursor.getDate()).padStart(2, '0')
+    keys.push(`${y}-${m}-${d}`)
+    cursor.setDate(cursor.getDate() + 1)
+  }
+  return keys
+}
+
 // ---- shared page chrome -------------------------------------------------
 
 function newDoc(title, subtitle) {
@@ -215,6 +249,93 @@ export function exportWeeklyReport({ history, itemsForPillar, weekTrail }) {
 
   footer(doc)
   doc.save(`tend-weekly-report-${new Date().toISOString().slice(0, 10)}.pdf`)
+}
+
+/**
+ * Any date range, picked by the person — one day, a week, a month,
+ * whatever `from`/`to` cover. Same shape as the 7-day rollup, just not
+ * pinned to "the last 7 days".
+ */
+export function exportRangeReport({ history, itemsForPillar, from, to }) {
+  const keys = dateRangeKeys(from, to)
+  const single = keys.length === 1
+  const title = single ? `Daily Report — ${from}` : `Report — ${from} to ${to}`
+  const { doc, pageWidth } = newDoc(title, `${keys.length} day${single ? '' : 's'}`)
+  let y = 100
+  const x = 40
+  const width = pageWidth - 80
+
+  y = sectionHeading(doc, 'Daily completion overview', x, y)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(10)
+  let daysWithData = 0
+  for (const key of keys) {
+    const rec = history[key]
+    if (!rec) continue
+    daysWithData += 1
+    if (y > 720) {
+      doc.addPage()
+      y = 60
+    }
+    const doneCount = PILLARS.filter(
+      (p) => pillarRatioLocal(itemsForPillar(p.id), rec.pillars?.[p.id]?.counts) >= 1
+    ).length
+    const tasks = rec.tasks || []
+    doc.setTextColor(...MUTED)
+    doc.text(key, x, y)
+    doc.setTextColor(...INK)
+    doc.text(
+      `${doneCount}/${PILLARS.length} pillars · ${tasks.filter((t) => t.done).length}/${tasks.length} tasks`,
+      x + 120,
+      y
+    )
+    y += 15
+  }
+  if (daysWithData === 0) {
+    doc.setFont('helvetica', 'italic')
+    doc.setTextColor(...MUTED)
+    doc.text('No data logged in this range.', x, y)
+    y += 15
+  }
+  y += 10
+
+  for (const pillar of PILLARS) {
+    if (y > 650) {
+      doc.addPage()
+      y = 60
+    }
+    const items = itemsForPillar(pillar.id)
+    y = sectionHeading(doc, `${pillar.label} — totals for this range`, x, y)
+
+    const totals = {}
+    let completedDays = 0
+    for (const key of keys) {
+      const rec = history[key]
+      const counts = rec?.pillars?.[pillar.id]?.counts || {}
+      if (rec && pillarRatioLocal(items, counts) >= 1) completedDays += 1
+      for (const item of items) {
+        totals[item.id] = (totals[item.id] || 0) + (counts[item.id] || 0)
+      }
+    }
+
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(10)
+    doc.setTextColor(...MUTED)
+    doc.text(`Fully completed on ${completedDays} of ${daysWithData || keys.length} logged day(s)`, x, y)
+    y += 16
+    for (const item of items) {
+      doc.setTextColor(...INK)
+      doc.text(String(item.label), x, y)
+      doc.setTextColor(...MUTED)
+      doc.text(`${fmt(totals[item.id] || 0)}${item.unit ? ' ' + item.unit : ''} total`, x + width * 0.5, y)
+      y += 15
+    }
+    y += 8
+  }
+
+  footer(doc)
+  const suffix = single ? from : `${from}_to_${to}`
+  doc.save(`tend-report-${suffix}.pdf`)
 }
 
 /** Raw JSON export of all locally stored data — full backup / portability. */

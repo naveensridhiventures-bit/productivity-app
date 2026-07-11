@@ -9,6 +9,7 @@ A daily practice tracker — morning workout, food intake, learning, savings, pl
   - Full daily report (every pillar + every sub-category + tasks)
   - One report per pillar (Workout / Food / Learning / Savings), broken down by sub-category
   - A 7-day rollup report
+  - A **custom date range** report — pick any two dates (or use the Today / This week / Last 7 days / This month / Last 30 days presets) and download a PDF covering exactly that range, pulled from full history
   - A raw `.json` backup of everything stored locally
   - All generated on-device with `jspdf` — nothing is uploaded anywhere.
 - **Daily Snapshot panel** — attach a photo to any pillar for today, via Cloudinary:
