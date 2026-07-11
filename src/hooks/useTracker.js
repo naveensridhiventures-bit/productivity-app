@@ -1,10 +1,28 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PILLARS, DEFAULT_SUB_ITEMS, SEED_TASKS, DAILY_QUOTES } from '../data/defaultTasks'
+import { getSyncUrl, setSyncUrl, fetchRemoteState, pushRemoteState } from '../lib/sheetSync'
 
 // Bumped from v1 -> v2: pillars moved from a single done/note flag to
 // calculated sub-items (exercises, meals, topics, goals). Old v1 data is
 // intentionally not migrated — it was a much simpler shape.
 const STORAGE_KEY = 'tend:v2'
+const UPDATED_AT_KEY = 'tend:v2:updatedAt'
+
+function loadUpdatedAt() {
+  try {
+    return Number(localStorage.getItem(UPDATED_AT_KEY)) || 0
+  } catch (e) {
+    return 0
+  }
+}
+
+function saveUpdatedAt(ts) {
+  try {
+    localStorage.setItem(UPDATED_AT_KEY, String(ts))
+  } catch (e) {
+    // ignore
+  }
+}
 
 function todayKey(d = new Date()) {
   const y = d.getFullYear()
@@ -79,9 +97,113 @@ export function useTracker() {
   const [state, setState] = useState(loadState)
   const key = todayKey()
 
+  // ---- Google Sheets sync (optional) ----
+  // Everything still works fully offline on localStorage. If a sync URL is
+  // configured, we additionally: pull on mount/tab-focus (replacing local
+  // state only if the remote copy is newer), and debounce-push local edits
+  // up to the sheet. Whole-state last-write-wins by `updatedAt` timestamp —
+  // simple and predictable for a single person syncing across their own
+  // couple of devices, at the cost of not merging concurrent edits.
+  const [syncUrl, setSyncUrlState] = useState(getSyncUrl)
+  const [syncStatus, setSyncStatus] = useState(syncUrl ? 'idle' : 'off')
+  const [lastSyncedAt, setLastSyncedAt] = useState(null)
+  const updatedAtRef = useRef(loadUpdatedAt())
+  const stateRef = useRef(state)
+  const isRemoteUpdateRef = useRef(false)
+  const readyRef = useRef(false)
+  const pushTimerRef = useRef(null)
+
+  useEffect(() => {
+    stateRef.current = state
+  }, [state])
+
+  const pushNow = useCallback(async (nextState, url) => {
+    if (!url) return
+    setSyncStatus('syncing')
+    try {
+      const now = Date.now()
+      updatedAtRef.current = now
+      saveUpdatedAt(now)
+      await pushRemoteState(url, nextState, now)
+      setSyncStatus('synced')
+      setLastSyncedAt(now)
+    } catch (e) {
+      console.warn('Sheet sync push failed', e)
+      setSyncStatus('error')
+    }
+  }, [])
+
+  const pullNow = useCallback(async (url) => {
+    setSyncStatus('syncing')
+    try {
+      const remote = await fetchRemoteState(url)
+      if (remote?.state && remote.updatedAt > updatedAtRef.current) {
+        isRemoteUpdateRef.current = true
+        updatedAtRef.current = remote.updatedAt
+        saveUpdatedAt(remote.updatedAt)
+        setState(remote.state)
+      }
+      setSyncStatus('synced')
+      setLastSyncedAt(Date.now())
+    } catch (e) {
+      console.warn('Sheet sync pull failed', e)
+      setSyncStatus('error')
+    } finally {
+      readyRef.current = true
+    }
+  }, [])
+
+  // Point the app at a new (or no) Apps Script URL.
+  const configureSync = useCallback((url) => {
+    setSyncUrl(url)
+    setSyncUrlState(url)
+    readyRef.current = false
+    setSyncStatus(url ? 'idle' : 'off')
+  }, [])
+
+  // Manual "sync now" — pull first (so a newer remote copy wins), then
+  // push whatever's currently local in case there were pending edits.
+  const syncNow = useCallback(async () => {
+    if (!syncUrl) return
+    await pullNow(syncUrl)
+    await pushNow(stateRef.current, syncUrl)
+  }, [syncUrl, pullNow, pushNow])
+
+  // Initial pull, plus a re-pull whenever the tab regains focus — covers
+  // "logged something on my phone, now opening the laptop" without needing
+  // a manual refresh.
+  useEffect(() => {
+    if (!syncUrl) {
+      readyRef.current = true
+      return undefined
+    }
+    readyRef.current = false
+    pullNow(syncUrl)
+    function onVisible() {
+      if (document.visibilityState === 'visible') pullNow(syncUrl)
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [syncUrl, pullNow])
+
+  // Persist locally on every change (always), and debounce a push to the
+  // sheet (only once the initial pull has settled, and never for the
+  // state change that the pull itself just caused).
   useEffect(() => {
     saveState(state)
-  }, [state])
+
+    if (isRemoteUpdateRef.current) {
+      isRemoteUpdateRef.current = false
+      return undefined
+    }
+    if (!syncUrl || !readyRef.current) return undefined
+
+    if (pushTimerRef.current) clearTimeout(pushTimerRef.current)
+    pushTimerRef.current = setTimeout(() => pushNow(state, syncUrl), 1500)
+    return () => {
+      if (pushTimerRef.current) clearTimeout(pushTimerRef.current)
+    }
+  }, [state, syncUrl, pushNow])
 
   // Ensure today's record exists, seeded from recurring tasks.
   useEffect(() => {
@@ -416,5 +538,12 @@ export function useTracker() {
     itemsForPillar,
     history: state.days, // full day-by-day history, for weekly/monthly reports
     rawState: state, // entire persisted object, for full JSON backup/export
+    sync: {
+      url: syncUrl,
+      configure: configureSync,
+      status: syncStatus,
+      lastSyncedAt,
+      syncNow,
+    },
   }
 }

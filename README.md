@@ -40,13 +40,25 @@ Opens on `http://localhost:5173`. Install it to your phone or desktop from the b
 - Below that: today's task list — daily regulars plus anything you add. Check "repeat daily" on a new task to make it a permanent fixture; otherwise it's just for today.
 - "This week" shows a 7-day trail, one dot per day, shaded by how much of the day got tended to.
 
-## Moving to Google Sheets later (optional)
+## Google Sheets sync (cross-device)
 
-Right now everything is local to the device — nothing syncs. When you're ready to sync across your phone and laptop the way your other apps do:
+Data lives in `localStorage` by default, but a "Sheets sync" panel (below Reports) lets you sync it to a free Google Sheet so the same data shows up on your phone and your laptop.
 
-1. `apps-script/Code.gs` is a ready-to-deploy backend, same shape as `sridhi-attendance2026`'s.
-2. Follow the setup comment at the top of that file (sheet + header row + deploy as web app).
-3. In `src/hooks/useTracker.js`, `loadState`/`saveState` are the only two functions that need to change — swap them for `fetch` calls to your Apps Script `/exec` URL. The rest of the app doesn't need to change, since it only talks to the hook.
+**One-time setup:**
+1. Create a new Google Sheet.
+2. Extensions → Apps Script, paste in `apps-script/Code.gs`.
+3. Run the `setup` function once (Run menu → select `setup` → Run) — it creates the `State` and `Days` tabs. It'll ask to authorize; allow it.
+4. Deploy → New deployment → type "Web app" → Execute as **Me** → Who has access **Anyone with the link** → Deploy. Copy the `/exec` URL.
+5. Paste that URL into the "Sheets sync" panel in the app and hit Connect.
+
+**How it works:** the whole tracker state (days, custom sub-items, tasks, target overrides) travels as one JSON blob in the `State` tab — that keeps the script simple and means it doesn't need updating every time the app's data shape changes. A `Days` tab is also rebuilt on every write with plain percentages per day, purely so the sheet is readable if you open it directly; the app itself never reads from it.
+
+Sync is whole-state **last-write-wins** by timestamp: it pulls on load and when the tab regains focus, and pushes ~1.5s after you stop making changes. That's simple and predictable for one person's phone + laptop, but it doesn't merge concurrent edits — if you change things on two devices in the same few seconds before either syncs, the last one to save wins.
+
+- `apps-script/Code.gs` — the backend, deployed as a Google Apps Script web app.
+- `src/lib/sheetSync.js` — fetch/push helpers talking to that web app.
+- `src/hooks/useTracker.js` — owns the sync status, debounced push, and pull-on-focus logic; `loadState`/`saveState` inside it still always write to `localStorage` first, so the app keeps working offline even if the sheet is unreachable.
+- `src/components/SheetSync.jsx` — the settings panel UI.
 
 ## Deploying
 

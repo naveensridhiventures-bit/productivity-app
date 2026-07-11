@@ -11,6 +11,7 @@ import Celebration from './components/Celebration'
 import Reports from './components/Reports'
 import Snapshot from './components/Snapshot'
 import Reminders from './components/Reminders'
+import SheetSync from './components/SheetSync'
 
 export default function App() {
   const {
@@ -32,6 +33,7 @@ export default function App() {
     itemsForPillar,
     history,
     rawState,
+    sync,
   } = useTracker()
 
   const [celebrated, setCelebrated] = useState(false)
@@ -112,6 +114,14 @@ export default function App() {
         history={history}
         weekTrail={weekTrail}
         rawState={rawState}
+      />
+
+      <SheetSync
+        url={sync.url}
+        configure={sync.configure}
+        status={sync.status}
+        lastSyncedAt={sync.lastSyncedAt}
+        syncNow={sync.syncNow}
       />
 
       {showCelebration ? (
