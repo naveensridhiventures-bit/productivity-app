@@ -50,8 +50,12 @@ export default function App() {
   }, [allPillarsDone, celebrated])
 
   const pillarsDoneIds = PILLARS.filter((p) => pillarProgress[p.id].done).map((p) => p.id)
-  const openPillarLabels = PILLARS.filter((p) => !pillarProgress[p.id].done).map((p) => p.label)
-  const reminders = useReminders(openPillarLabels)
+  const pillarStatus = PILLARS.map((p) => ({
+    id: p.id,
+    label: p.label,
+    done: pillarProgress[p.id].done,
+  }))
+  const reminders = useReminders(pillarStatus)
 
   return (
     <>
@@ -96,7 +100,7 @@ export default function App() {
 
       <Reminders
         settings={reminders.settings}
-        update={reminders.update}
+        updatePillar={reminders.updatePillar}
         permission={reminders.permission}
         requestPermission={reminders.requestPermission}
         sendTest={reminders.sendTest}

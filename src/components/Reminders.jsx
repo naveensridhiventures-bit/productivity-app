@@ -1,15 +1,16 @@
-export default function Reminders({ settings, update, permission, requestPermission, sendTest, supported }) {
+import { PILLARS } from '../data/defaultTasks'
+
+export default function Reminders({ settings, updatePillar, permission, requestPermission, sendTest, supported }) {
   const granted = permission === 'granted'
   const denied = permission === 'denied'
+  const anyEnabled = Object.values(settings.pillars).some((p) => p.enabled)
 
-  async function handleEnable(checked) {
+  async function handleToggle(pillarId, checked) {
     if (checked && !granted) {
       const result = await requestPermission()
-      if (result === 'granted') update({ enabled: true })
-      // if denied/dismissed, leave the toggle off — the status line explains why
-      return
+      if (result !== 'granted') return // stay off — status line below explains why
     }
-    update({ enabled: checked })
+    updatePillar(pillarId, { enabled: checked })
   }
 
   return (
@@ -22,37 +23,42 @@ export default function Reminders({ settings, update, permission, requestPermiss
           </p>
         ) : (
           <>
-            <div className="reminders-row">
-              <label className="hud-switch">
-                <input
-                  type="checkbox"
-                  checked={settings.enabled && granted}
-                  onChange={(e) => handleEnable(e.target.checked)}
-                />
-                <span className="hud-switch-track" aria-hidden="true">
-                  <span className="hud-switch-thumb" />
-                </span>
-                <span>Daily nudge</span>
-              </label>
+            {PILLARS.map((pillar) => {
+              const cfg = settings.pillars[pillar.id]
+              return (
+                <div className="reminders-row" key={pillar.id}>
+                  <label className="hud-switch">
+                    <input
+                      type="checkbox"
+                      checked={cfg.enabled && granted}
+                      onChange={(e) => handleToggle(pillar.id, e.target.checked)}
+                    />
+                    <span className="hud-switch-track" aria-hidden="true">
+                      <span className="hud-switch-thumb" />
+                    </span>
+                    <span>{pillar.label}</span>
+                  </label>
 
-              <input
-                type="time"
-                className="reminders-time"
-                value={settings.time}
-                disabled={!settings.enabled || !granted}
-                onChange={(e) => update({ time: e.target.value })}
-                aria-label="Reminder time"
-              />
-            </div>
+                  <input
+                    type="time"
+                    className="reminders-time"
+                    value={cfg.time}
+                    disabled={!cfg.enabled || !granted}
+                    onChange={(e) => updatePillar(pillar.id, { time: e.target.value })}
+                    aria-label={`${pillar.label} reminder time`}
+                  />
+                </div>
+              )
+            })}
 
             <p className={`reminders-status ${denied ? 'is-warn' : ''}`}>
               {denied
                 ? 'Notifications are blocked for this site — allow them in your browser/site settings to use this.'
                 : granted
-                  ? settings.enabled
-                    ? `Armed — pings you at ${settings.time} for any pillar still open that day.`
-                    : 'Off. Flip the switch to arm it.'
-                  : 'Not enabled yet — flip the switch and allow notifications when prompted.'}
+                  ? anyEnabled
+                    ? 'Armed — each pillar pings once at its own time, only if still open then.'
+                    : 'Off. Flip a switch above to arm one.'
+                  : 'Flip a switch above and allow notifications when prompted.'}
             </p>
 
             {granted ? (

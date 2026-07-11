@@ -872,6 +872,11 @@ input, textarea, select {
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
+  padding: 8px 0;
+}
+
+.reminders-row:not(:last-of-type) {
+  border-bottom: 1px solid var(--line);
 }
 
 .hud-switch {

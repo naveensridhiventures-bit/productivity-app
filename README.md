@@ -87,11 +87,11 @@ Or push to a new GitHub repo and connect it in the Vercel dashboard. Either way,
 
 ## Reminders
 
-A "Daily nudge" panel sits between the week trail and the snapshot panel. Flip it on, pick a time, and grant the browser permission when prompted — from then on, if any pillar is still open at that time, you get a local notification listing which ones. It's fully on-device:
+A per-pillar "Reminders" panel sits between the week trail and the sync panel — one switch and one time picker per pillar (Workout, Food, Learning, Savings), each independent. Arm any of them, grant the browser permission when prompted, and each armed pillar pings you once at its own time — only if that specific pillar is still undone. Defaults are 7am workout, 1pm food, 6pm learning, 9pm savings, but every time is editable. It's fully on-device:
 
 - `src/lib/notifications.js` — thin wrapper around the Notification API (permission checks + firing, preferring the service worker registration so it still fires with the tab backgrounded).
-- `src/hooks/useReminders.js` — owns the on/off + time setting (persisted to `localStorage` under `tend:reminders:v1`), and schedules the next check with `setTimeout`, re-checking on tab-focus and at least every 6h so it recovers cleanly after the device sleeps or the tab was closed.
-- `src/components/Reminders.jsx` — the settings panel UI (toggle, time picker, permission/status line, test button).
+- `src/hooks/useReminders.js` — owns each pillar's on/off + time (persisted to `localStorage` under `tend:reminders:v2`), and schedules the next check with `setTimeout` — always waking for whichever armed pillar's time is soonest — re-checking on tab-focus and at least every 6h so it recovers cleanly after the device sleeps or the tab was closed.
+- `src/components/Reminders.jsx` — the settings panel UI (one row per pillar, plus a shared status line and test button).
 
 Since this has no server or push subscription, it only fires while the browser itself is running (even if the tab isn't focused) — it won't wake a fully closed browser. That's the tradeoff for staying 100% local; true background push would need the Apps Script backend plus a push service.
 
