@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { PILLARS } from './data/defaultTasks'
 import { useTracker } from './hooks/useTracker'
+import { useReminders } from './hooks/useReminders'
 import Header from './components/Header'
 import ProgressRing from './components/ProgressRing'
 import PillarCard from './components/PillarCard'
@@ -9,6 +10,7 @@ import WeekTrail from './components/WeekTrail'
 import Celebration from './components/Celebration'
 import Reports from './components/Reports'
 import Snapshot from './components/Snapshot'
+import Reminders from './components/Reminders'
 
 export default function App() {
   const {
@@ -46,6 +48,8 @@ export default function App() {
   }, [allPillarsDone, celebrated])
 
   const pillarsDoneIds = PILLARS.filter((p) => pillarProgress[p.id].done).map((p) => p.id)
+  const openPillarLabels = PILLARS.filter((p) => !pillarProgress[p.id].done).map((p) => p.label)
+  const reminders = useReminders(openPillarLabels)
 
   return (
     <>
@@ -87,6 +91,15 @@ export default function App() {
       />
 
       <WeekTrail days={weekTrail} />
+
+      <Reminders
+        settings={reminders.settings}
+        update={reminders.update}
+        permission={reminders.permission}
+        requestPermission={reminders.requestPermission}
+        sendTest={reminders.sendTest}
+        supported={reminders.supported}
+      />
 
       <Snapshot today={today} setPillarPhoto={setPillarPhoto} />
 

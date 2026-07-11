@@ -292,7 +292,7 @@ input, textarea, select {
   box-shadow: 0 0 6px var(--core);
 }
 
-.pillars, .task-list, .week-trail, .reports-section, .snapshot-section {
+.pillars, .task-list, .week-trail, .reports-section, .snapshot-section, .reminders-section {
   margin-top: 30px;
 }
 
@@ -859,6 +859,106 @@ input, textarea, select {
   font-size: 11px;
   color: var(--ink-muted);
   font-family: var(--font-mono);
+}
+
+/* ---------- Reminders panel ---------- */
+.reminders-panel {
+  padding: 16px;
+}
+
+.reminders-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.hud-switch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--ink);
+  cursor: pointer;
+  user-select: none;
+}
+
+.hud-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.hud-switch-track {
+  flex-shrink: 0;
+  width: 40px;
+  height: 22px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--line);
+  position: relative;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hud-switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--ink-faint);
+  transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.hud-switch input:checked + .hud-switch-track {
+  border-color: var(--core);
+  box-shadow: 0 0 10px -2px var(--core);
+}
+
+.hud-switch input:checked + .hud-switch-track .hud-switch-thumb {
+  transform: translateX(18px);
+  background: var(--core);
+  box-shadow: 0 0 8px var(--core);
+}
+
+.hud-switch input:focus-visible + .hud-switch-track {
+  outline: 2px solid var(--core);
+  outline-offset: 2px;
+}
+
+.reminders-time {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.reminders-time:disabled {
+  opacity: 0.4;
+}
+
+.reminders-status {
+  margin: 12px 0 0;
+  font-size: 12px;
+  color: var(--ink-muted);
+  font-family: var(--font-mono);
+  line-height: 1.5;
+}
+
+.reminders-status.is-warn {
+  color: var(--gold);
+}
+
+.reminders-test-btn {
+  width: 100%;
+  margin-top: 12px;
+  justify-content: center;
 }
 
 /* ---------- Snapshot / Cloudinary image panel ---------- */

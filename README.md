@@ -73,11 +73,20 @@ Or push to a new GitHub repo and connect it in the Vercel dashboard. Either way,
 
 `.env` is already in `.gitignore` — don't commit it. On Vercel, add the same two variables under Project Settings -> Environment Variables.
 
+## Reminders
+
+A "Daily nudge" panel sits between the week trail and the snapshot panel. Flip it on, pick a time, and grant the browser permission when prompted — from then on, if any pillar is still open at that time, you get a local notification listing which ones. It's fully on-device:
+
+- `src/lib/notifications.js` — thin wrapper around the Notification API (permission checks + firing, preferring the service worker registration so it still fires with the tab backgrounded).
+- `src/hooks/useReminders.js` — owns the on/off + time setting (persisted to `localStorage` under `tend:reminders:v1`), and schedules the next check with `setTimeout`, re-checking on tab-focus and at least every 6h so it recovers cleanly after the device sleeps or the tab was closed.
+- `src/components/Reminders.jsx` — the settings panel UI (toggle, time picker, permission/status line, test button).
+
+Since this has no server or push subscription, it only fires while the browser itself is running (even if the tab isn't focused) — it won't wake a fully closed browser. That's the tradeoff for staying 100% local; true background push would need the Apps Script backend plus a push service.
+
 ## Ideas for what to add next
 
 Roughly in order of how much value they'd add for the effort:
 
-- **Reminders/notifications** — a scheduled browser notification ("Log today's workout") using the Notifications API + the PWA service worker already in place.
 - **Monthly/trend charts** — a simple line or bar chart (e.g. with a tiny inline SVG, no new dependency) showing each pillar's completion % over 30 days, so patterns show up before a streak breaks.
 - **Voice input, Jarvis-style** — Web Speech API for "log 20 push-ups" style quick entry; fits the theme well and needs no backend.
 - **Cross-device sync** — the README already documents a Google Sheets/Apps Script path (`apps-script/Code.gs`); wiring `loadState`/`saveState` in `useTracker.js` to it is the only change needed.
