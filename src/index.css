@@ -292,7 +292,7 @@ input, textarea, select {
   box-shadow: 0 0 6px var(--core);
 }
 
-.pillars, .task-list, .week-trail, .reports-section, .snapshot-section, .reminders-section, .sync-section {
+.pillars, .task-list, .week-trail, .reports-section, .analytics-section, .reminders-section, .alarms-section, .sync-section {
   margin-top: 30px;
 }
 
@@ -558,6 +558,56 @@ input, textarea, select {
 
 .subitem-remove:hover {
   color: var(--clay);
+}
+
+.subitem-manage {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.subitem-edit-btn {
+  background: none;
+  border: none;
+  color: var(--ink-faint);
+  font-size: 13px;
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.subitem-edit-btn:hover {
+  color: var(--core);
+}
+
+.subitem-row-editing {
+  display: block;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px dashed var(--line-strong);
+}
+
+.subitem-edit-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.subitem-edit-form input[type='text'] {
+  flex: 2;
+  min-width: 90px;
+}
+
+.subitem-edit-form input[type='number'] {
+  flex: 1;
+  min-width: 60px;
+}
+
+.subitem-edit-form input {
+  padding: 7px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  background: rgba(0, 0, 0, 0.35);
+  font-size: 13px;
 }
 
 .subitem-mini-track {
@@ -1039,41 +1089,6 @@ input, textarea, select {
   padding: 16px;
 }
 
-.sync-form {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.sync-url-input {
-  flex: 1;
-  min-width: 160px;
-  padding: 10px 12px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--line);
-  background: rgba(0, 0, 0, 0.3);
-  font-family: var(--font-mono);
-  font-size: 12.5px;
-}
-
-.sync-save-btn {
-  flex-shrink: 0;
-  padding: 10px 14px;
-}
-
-.sync-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.sync-disconnect-btn:hover {
-  border-color: var(--clay);
-  color: var(--clay);
-  box-shadow: 0 0 12px -4px var(--clay);
-}
-
 .sync-hint {
   margin: 12px 0 0;
   font-size: 11.5px;
@@ -1087,128 +1102,6 @@ input, textarea, select {
   padding: 1px 5px;
   border-radius: 4px;
   color: var(--core);
-}
-
-/* ---------- Snapshot / Cloudinary image panel ---------- */
-.snapshot-panel {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  padding: 16px;
-  backdrop-filter: blur(8px);
-}
-
-.snapshot-pillar-picker {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  margin-bottom: 12px;
-}
-
-.snapshot-pillar-chip {
-  background: rgba(0,0,0,0.3);
-  border: 1px solid var(--line);
-  color: var(--ink-muted);
-  border-radius: 999px;
-  padding: 6px 12px;
-  font-size: 12px;
-  font-family: var(--font-mono);
-}
-
-.snapshot-pillar-chip.is-active {
-  border-color: var(--core);
-  color: var(--core);
-  box-shadow: 0 0 10px -3px var(--core);
-}
-
-.snapshot-drop {
-  border: 1px dashed var(--line-strong);
-  border-radius: var(--radius-sm);
-  padding: 22px 14px;
-  text-align: center;
-  color: var(--ink-muted);
-  font-size: 12.5px;
-  font-family: var(--font-mono);
-  cursor: pointer;
-  transition: border-color 0.15s ease, color 0.15s ease;
-}
-
-.snapshot-drop:hover, .snapshot-drop.is-dragover {
-  border-color: var(--core);
-  color: var(--core);
-}
-
-.snapshot-url-row {
-  display: flex;
-  gap: 6px;
-  margin-top: 10px;
-}
-
-.snapshot-url-row input {
-  flex: 1;
-  padding: 8px 10px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--line);
-  background: rgba(0,0,0,0.3);
-  font-size: 12px;
-  font-family: var(--font-mono);
-}
-
-.snapshot-preview {
-  margin-top: 14px;
-}
-
-.snapshot-preview img {
-  width: 100%;
-  max-height: 260px;
-  object-fit: cover;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--line-strong);
-  box-shadow: 0 0 20px -6px var(--core);
-}
-
-.snapshot-edit-row {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  margin-top: 10px;
-}
-
-.snapshot-edit-btn {
-  background: rgba(0,0,0,0.3);
-  border: 1px solid var(--line);
-  color: var(--ink-muted);
-  border-radius: var(--radius-sm);
-  padding: 6px 10px;
-  font-size: 11.5px;
-  font-family: var(--font-mono);
-}
-
-.snapshot-edit-btn.is-active,
-.snapshot-edit-btn:hover {
-  border-color: var(--sky);
-  color: var(--sky);
-}
-
-.snapshot-status {
-  margin-top: 8px;
-  font-size: 11px;
-  font-family: var(--font-mono);
-  color: var(--ink-muted);
-}
-
-.snapshot-status.is-error { color: var(--clay); }
-.snapshot-status.is-ok { color: var(--moss); }
-
-.snapshot-config-warning {
-  margin-bottom: 12px;
-  padding: 10px 12px;
-  border: 1px solid var(--gold);
-  background: var(--gold-soft);
-  color: var(--gold);
-  border-radius: var(--radius-sm);
-  font-size: 11.5px;
-  font-family: var(--font-mono);
 }
 
 /* ---------- Celebration ---------- */

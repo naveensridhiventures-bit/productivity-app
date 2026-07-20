@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DEFAULT_CATEGORIES, DEFAULT_SUB_ITEMS, SEED_TASKS, DAILY_QUOTES } from '../data/defaultTasks'
-import { getSyncUrl, setSyncUrl, fetchRemoteState, pushRemoteState } from '../lib/sheetSync'
+import { getSyncUrl, fetchRemoteState, pushRemoteState } from '../lib/sheetSync'
 
 // Bumped from v1 -> v2: pillars moved from a single done/note flag to
 // calculated sub-items (exercises, meals, topics, goals). Old v1 data is
@@ -58,6 +58,7 @@ function loadState() {
     categories: DEFAULT_CATEGORIES,
     recurringTasks: SEED_TASKS.map(({ id, text }) => ({ id, text })),
     subItemsConfig: {}, // pillarId -> array of custom sub-items (defaults merged in at read time)
+    hiddenDefaultSubItems: {}, // pillarId -> array of default sub-item ids the user deleted/edited away
     days: {},
   }
 }
@@ -75,10 +76,12 @@ function saveState(state) {
   }
 }
 
-// Merge default sub-items with any custom ones the user has added for a pillar.
-function subItemsFor(pillarId, subItemsConfig) {
+// Merge default sub-items with any custom ones the user has added for a
+// pillar, minus any defaults the user has explicitly deleted/edited away.
+function subItemsFor(pillarId, subItemsConfig, hiddenDefaults) {
   const custom = subItemsConfig?.[pillarId] || []
-  const defaults = DEFAULT_SUB_ITEMS[pillarId] || []
+  const hidden = hiddenDefaults?.[pillarId] || []
+  const defaults = (DEFAULT_SUB_ITEMS[pillarId] || []).filter((d) => !hidden.includes(d.id))
   return [...defaults, ...custom]
 }
 
@@ -86,6 +89,16 @@ function subItemsFor(pillarId, subItemsConfig) {
 function itemRatio(count, target) {
   if (!target || target <= 0) return count > 0 ? 1 : 0
   return Math.min(1, (count || 0) / target)
+}
+
+// Only pull the fields a sub-item edit is allowed to touch, with sane types.
+function cleanPatch(patch) {
+  const out = {}
+  if (patch.label != null) out.label = String(patch.label)
+  if (patch.unit != null) out.unit = String(patch.unit)
+  if (patch.target != null) out.target = Number(patch.target) || 1
+  if (patch.step != null) out.step = Number(patch.step) || 1
+  return out
 }
 
 // A pillar's overall completion — the weighted average of its sub-items'
@@ -109,13 +122,14 @@ export function useTracker() {
   const categories = state.categories && state.categories.length ? state.categories : DEFAULT_CATEGORIES
 
   // ---- Google Sheets sync (optional) ----
-  // Everything still works fully offline on localStorage. If a sync URL is
-  // configured, we additionally: pull on mount/tab-focus (replacing local
-  // state only if the remote copy is newer), and debounce-push local edits
-  // up to the sheet. Whole-state last-write-wins by `updatedAt` timestamp —
-  // simple and predictable for a single person syncing across their own
-  // couple of devices, at the cost of not merging concurrent edits.
-  const [syncUrl, setSyncUrlState] = useState(getSyncUrl)
+  // Everything still works fully offline on localStorage. The endpoint is
+  // fixed in src/lib/sheetSync.js (not user-configurable) — if it's set, we
+  // pull on mount/tab-focus (replacing local state only if the remote copy
+  // is newer) and debounce-push local edits up to the sheet. Whole-state
+  // last-write-wins by `updatedAt` timestamp — simple and predictable for a
+  // single person syncing across their own couple of devices, at the cost
+  // of not merging concurrent edits.
+  const syncUrl = getSyncUrl()
   const [syncStatus, setSyncStatus] = useState(syncUrl ? 'idle' : 'off')
   const [lastSyncedAt, setLastSyncedAt] = useState(null)
   const updatedAtRef = useRef(loadUpdatedAt())
@@ -128,26 +142,27 @@ export function useTracker() {
     stateRef.current = state
   }, [state])
 
-  const pushNow = useCallback(async (nextState, url) => {
-    if (!url) return
+  const pushNow = useCallback(async (nextState) => {
+    if (!syncUrl) return
     setSyncStatus('syncing')
     try {
       const now = Date.now()
       updatedAtRef.current = now
       saveUpdatedAt(now)
-      await pushRemoteState(url, nextState, now)
+      await pushRemoteState(nextState, now)
       setSyncStatus('synced')
       setLastSyncedAt(now)
     } catch (e) {
       console.warn('Sheet sync push failed', e)
       setSyncStatus('error')
     }
-  }, [])
+  }, [syncUrl])
 
-  const pullNow = useCallback(async (url) => {
+  const pullNow = useCallback(async () => {
+    if (!syncUrl) return
     setSyncStatus('syncing')
     try {
-      const remote = await fetchRemoteState(url)
+      const remote = await fetchRemoteState()
       if (remote?.state && remote.updatedAt > updatedAtRef.current) {
         isRemoteUpdateRef.current = true
         updatedAtRef.current = remote.updatedAt
@@ -162,22 +177,14 @@ export function useTracker() {
     } finally {
       readyRef.current = true
     }
-  }, [])
-
-  // Point the app at a new (or no) Apps Script URL.
-  const configureSync = useCallback((url) => {
-    setSyncUrl(url)
-    setSyncUrlState(url)
-    readyRef.current = false
-    setSyncStatus(url ? 'idle' : 'off')
-  }, [])
+  }, [syncUrl])
 
   // Manual "sync now" — pull first (so a newer remote copy wins), then
   // push whatever's currently local in case there were pending edits.
   const syncNow = useCallback(async () => {
     if (!syncUrl) return
-    await pullNow(syncUrl)
-    await pushNow(stateRef.current, syncUrl)
+    await pullNow()
+    await pushNow(stateRef.current)
   }, [syncUrl, pullNow, pushNow])
 
   // Initial pull, plus a re-pull whenever the tab regains focus — covers
@@ -189,9 +196,9 @@ export function useTracker() {
       return undefined
     }
     readyRef.current = false
-    pullNow(syncUrl)
+    pullNow()
     function onVisible() {
-      if (document.visibilityState === 'visible') pullNow(syncUrl)
+      if (document.visibilityState === 'visible') pullNow()
     }
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
@@ -210,7 +217,7 @@ export function useTracker() {
     if (!syncUrl || !readyRef.current) return undefined
 
     if (pushTimerRef.current) clearTimeout(pushTimerRef.current)
-    pushTimerRef.current = setTimeout(() => pushNow(state, syncUrl), 1500)
+    pushTimerRef.current = setTimeout(() => pushNow(state), 1500)
     return () => {
       if (pushTimerRef.current) clearTimeout(pushTimerRef.current)
     }
@@ -238,14 +245,15 @@ export function useTracker() {
 
   const today = state.days[key] || { pillars: emptyPillars(categories), tasks: [] }
   const subItemsConfig = state.subItemsConfig || {}
+  const hiddenDefaultSubItems = state.hiddenDefaultSubItems || {}
 
   const pillarItems = useMemo(() => {
     const map = {}
     for (const pillar of categories) {
-      map[pillar.id] = subItemsFor(pillar.id, subItemsConfig)
+      map[pillar.id] = subItemsFor(pillar.id, subItemsConfig, hiddenDefaultSubItems)
     }
     return map
-  }, [subItemsConfig, categories])
+  }, [subItemsConfig, hiddenDefaultSubItems, categories])
 
   // Set an exact count for one sub-item within a pillar, today.
   const setSubCount = useCallback(
@@ -313,19 +321,10 @@ export function useTracker() {
     }))
   }, [])
 
-  // Remove a custom sub-item. Default sub-items can't be removed, only edited.
+  // Remove any sub-item — default or custom. Defaults are recorded as
+  // "hidden" so they stop appearing; customs are dropped outright. Past
+  // logged counts for it stay in history untouched.
   const removeSubItem = useCallback((pillarId, subId) => {
-    setState((prev) => ({
-      ...prev,
-      subItemsConfig: {
-        ...prev.subItemsConfig,
-        [pillarId]: (prev.subItemsConfig?.[pillarId] || []).filter((i) => i.id !== subId),
-      },
-    }))
-  }, [])
-
-  // Change a sub-item's daily target (default or custom).
-  const updateSubItemTarget = useCallback((pillarId, subId, target) => {
     setState((prev) => {
       const isCustom = (prev.subItemsConfig?.[pillarId] || []).some((i) => i.id === subId)
       if (isCustom) {
@@ -333,22 +332,62 @@ export function useTracker() {
           ...prev,
           subItemsConfig: {
             ...prev.subItemsConfig,
-            [pillarId]: prev.subItemsConfig[pillarId].map((i) =>
-              i.id === subId ? { ...i, target: Number(target) || 1 } : i
-            ),
+            [pillarId]: prev.subItemsConfig[pillarId].filter((i) => i.id !== subId),
           },
         }
       }
-      // Overriding a default target — store it as a target-only override.
+      // It's a default — hide it instead of trying to delete a constant.
+      const hidden = prev.hiddenDefaultSubItems?.[pillarId] || []
+      if (hidden.includes(subId)) return prev
       return {
         ...prev,
-        targetOverrides: {
-          ...(prev.targetOverrides || {}),
-          [pillarId]: { ...(prev.targetOverrides?.[pillarId] || {}), [subId]: Number(target) || 1 },
+        hiddenDefaultSubItems: {
+          ...prev.hiddenDefaultSubItems,
+          [pillarId]: [...hidden, subId],
         },
       }
     })
   }, [])
+
+  // Edit any sub-item's label/unit/target/step — default or custom. Editing
+  // a default "promotes" it into a custom entry (same id, so history stays
+  // intact) and hides the original constant definition.
+  const updateSubItem = useCallback((pillarId, subId, patch) => {
+    setState((prev) => {
+      const customList = prev.subItemsConfig?.[pillarId] || []
+      const isCustom = customList.some((i) => i.id === subId)
+
+      if (isCustom) {
+        return {
+          ...prev,
+          subItemsConfig: {
+            ...prev.subItemsConfig,
+            [pillarId]: customList.map((i) => (i.id === subId ? { ...i, ...cleanPatch(patch) } : i)),
+          },
+        }
+      }
+
+      // Promote the default into a custom entry carrying the same id.
+      const original = (DEFAULT_SUB_ITEMS[pillarId] || []).find((i) => i.id === subId)
+      if (!original) return prev
+      const promoted = { ...original, ...cleanPatch(patch), id: subId, custom: true }
+      const hidden = prev.hiddenDefaultSubItems?.[pillarId] || []
+      return {
+        ...prev,
+        subItemsConfig: { ...prev.subItemsConfig, [pillarId]: [...customList, promoted] },
+        hiddenDefaultSubItems: {
+          ...prev.hiddenDefaultSubItems,
+          [pillarId]: hidden.includes(subId) ? hidden : [...hidden, subId],
+        },
+      }
+    })
+  }, [])
+
+  // Kept for anything still calling the old name — just a target-only edit.
+  const updateSubItemTarget = useCallback(
+    (pillarId, subId, target) => updateSubItem(pillarId, subId, { target }),
+    [updateSubItem]
+  )
 
   // Add a brand-new main category (e.g. "Meditation"). Starts with no
   // sub-items — the person builds it out with "+ Add sub-category" just
@@ -546,31 +585,6 @@ export function useTracker() {
 
   const allPillarsDone = categories.every((p) => pillarProgress[p.id].done)
 
-  // Attach a photo (e.g. a Cloudinary URL) to a pillar for today. Used by
-  // the "Daily Snapshot" panel — purely optional visual evidence per pillar.
-  const setPillarPhoto = useCallback(
-    (pillarId, photo) => {
-      setState((prev) => {
-        const day = prev.days[key] || { pillars: emptyPillars(categories), tasks: [] }
-        const pillar = day.pillars[pillarId] || { counts: {} }
-        return {
-          ...prev,
-          days: {
-            ...prev.days,
-            [key]: {
-              ...day,
-              pillars: {
-                ...day.pillars,
-                [pillarId]: { ...pillar, photo: photo || null },
-              },
-            },
-          },
-        }
-      })
-    },
-    [key]
-  )
-
   // Exposes effective (default + custom + overrides) sub-items for any
   // pillar — needed by the report generator so downloads match what's
   // actually shown on screen.
@@ -588,6 +602,7 @@ export function useTracker() {
     bumpSubCount,
     addSubItem,
     removeSubItem,
+    updateSubItem,
     updateSubItemTarget,
     addTask,
     toggleTask,
@@ -597,13 +612,11 @@ export function useTracker() {
     weekTrail,
     quote,
     allPillarsDone,
-    setPillarPhoto,
     itemsForPillar,
     history: state.days, // full day-by-day history, for weekly/monthly reports
     rawState: state, // entire persisted object, for full JSON backup/export
     sync: {
       url: syncUrl,
-      configure: configureSync,
       status: syncStatus,
       lastSyncedAt,
       syncNow,

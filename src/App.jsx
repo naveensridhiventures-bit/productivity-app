@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useTracker } from './hooks/useTracker'
 import { useReminders } from './hooks/useReminders'
 import { useAlarms } from './hooks/useAlarms'
+import { unlockAudio } from './lib/ringtones'
 import Header from './components/Header'
 import ProgressRing from './components/ProgressRing'
 import PillarCard from './components/PillarCard'
@@ -11,7 +12,6 @@ import WeekTrail from './components/WeekTrail'
 import Celebration from './components/Celebration'
 import Reports from './components/Reports'
 import Analytics from './components/Analytics'
-import Snapshot from './components/Snapshot'
 import Reminders from './components/Reminders'
 import AlarmManager from './components/AlarmManager'
 import AlarmPopup from './components/AlarmPopup'
@@ -29,6 +29,7 @@ export default function App() {
     bumpSubCount,
     addSubItem,
     removeSubItem,
+    updateSubItem,
     addTask,
     toggleTask,
     removeTask,
@@ -37,7 +38,6 @@ export default function App() {
     weekTrail,
     quote,
     allPillarsDone,
-    setPillarPhoto,
     itemsForPillar,
     history,
     rawState,
@@ -46,6 +46,24 @@ export default function App() {
 
   const [celebrated, setCelebrated] = useState(false)
   const [showCelebration, setShowCelebration] = useState(false)
+
+  // Browsers block sound until a real user gesture happens on the page.
+  // Unlock it on the very first tap/click/key anywhere in the app — not
+  // just from the alarm form — so an alarm set once and forgotten still
+  // has a working ringtone next time it fires.
+  useEffect(() => {
+    function unlockOnce() {
+      unlockAudio()
+      window.removeEventListener('pointerdown', unlockOnce)
+      window.removeEventListener('keydown', unlockOnce)
+    }
+    window.addEventListener('pointerdown', unlockOnce, { once: true })
+    window.addEventListener('keydown', unlockOnce, { once: true })
+    return () => {
+      window.removeEventListener('pointerdown', unlockOnce)
+      window.removeEventListener('keydown', unlockOnce)
+    }
+  }, [])
 
   useEffect(() => {
     if (allPillarsDone && !celebrated) {
@@ -94,6 +112,7 @@ export default function App() {
               onSetCount={(subId, count) => setSubCount(pillar.id, subId, count)}
               onAddSubItem={(item) => addSubItem(pillar.id, item)}
               onRemoveSubItem={(subId) => removeSubItem(pillar.id, subId)}
+              onUpdateSubItem={(subId, patch) => updateSubItem(pillar.id, subId, patch)}
               onEditCategory={(patch) => updateCategory(pillar.id, patch)}
               onRemoveCategory={() => removeCategory(pillar.id)}
             />
@@ -132,8 +151,6 @@ export default function App() {
         supported={alarms.supported}
       />
 
-      <Snapshot today={today} setPillarPhoto={setPillarPhoto} categories={categories} />
-
       <Analytics categories={categories} itemsForPillar={itemsForPillar} history={history} />
 
       <Reports
@@ -150,7 +167,6 @@ export default function App() {
 
       <SheetSync
         url={sync.url}
-        configure={sync.configure}
         status={sync.status}
         lastSyncedAt={sync.lastSyncedAt}
         syncNow={sync.syncNow}

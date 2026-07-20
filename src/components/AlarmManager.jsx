@@ -47,7 +47,6 @@ export default function AlarmManager({
         {alarms.length === 0 && !adding ? (
           <p className="empty-note">No alarms set. Add one to get an on-screen alert plus a ringtone.</p>
         ) : null}
-
         <ul className="alarm-list">
           {alarms.map((alarm) => (
             <li key={alarm.id} className="alarm-row">
@@ -124,6 +123,12 @@ export default function AlarmManager({
             + Add alarm
           </button>
         )}
+
+        <p className="reports-note">
+          Fully offline — the ringtone and pop-up run entirely on this device, no internet needed. The
+          browser (or installed app) just needs to still be running, even minimized; if it was fully
+          closed, any alarm you missed rings the moment you reopen it.
+        </p>
       </div>
     </section>
   )

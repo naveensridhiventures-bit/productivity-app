@@ -12,11 +12,9 @@ A daily practice tracker — morning workout, food intake, learning, savings, pl
   - A **custom date range** report — pick any two dates (or use the Today / This week / Last 7 days / This month / Last 30 days presets) and download a PDF covering exactly that range, pulled from full history
   - A raw `.json` backup of everything stored locally
   - All generated on-device with `jspdf` — nothing is uploaded anywhere.
-- **Daily Snapshot panel** — attach a photo to any pillar for today, via Cloudinary:
-  - Upload a file directly (unsigned upload)
-  - Or paste an image URL and have Cloudinary fetch + host it instead
-  - One-tap edits (grayscale, sepia, brighten, contrast, square crop, rotate) — these are just Cloudinary URL transforms, so they're instant and don't re-upload anything.
-  - Requires a free Cloudinary account — see **Cloudinary setup** below. Until configured, the panel shows a clear inline notice instead of failing silently.
+- **Editable categories** — rename or delete any category (default or custom), and add brand-new ones with your own icon/color via the "+ New category" card. Sub-categories within each are fully add/edit/delete too, not just the custom ones.
+- **Alarms** — separate from daily tracking: set any number of named alarms with a time, a note, and a choice of synthesized ringtone. When one fires you get a full-screen animated pop-up plus the ringtone, with Snooze/Dismiss. 100% on-device, no internet required to fire.
+- **Analytics dashboard** — bar/line/radar charts (via `recharts`) over 7/30/90 days or all-time, plus plain-English insight callouts (strongest area, weakest area, trending up/down). Also exports the full history to a real `.xlsx` workbook (via `xlsx`/SheetJS), one sheet per category.
 
 ## Run it locally
 
@@ -72,20 +70,6 @@ vercel
 
 Or push to a new GitHub repo and connect it in the Vercel dashboard. Either way, run `npm run build` first if you want to sanity-check the production build locally with `npm run preview`.
 
-## Cloudinary setup (for Daily Snapshot)
-
-1. Create a free account at https://cloudinary.com.
-2. Copy your **Cloud name** from the Dashboard home page.
-3. Go to Settings -> Upload -> Upload presets -> **Add upload preset**, set **Signing Mode** to `Unsigned`, save, and copy its name.
-4. Copy `.env.example` to `.env` in the project root and fill in both values:
-   ```
-   VITE_CLOUDINARY_CLOUD_NAME=your-cloud-name
-   VITE_CLOUDINARY_UPLOAD_PRESET=your-preset-name
-   ```
-5. Restart `npm run dev`. The Daily Snapshot panel's config warning disappears once both are set.
-
-`.env` is already in `.gitignore` — don't commit it. On Vercel, add the same two variables under Project Settings -> Environment Variables.
-
 ## Reminders
 
 A per-pillar "Reminders" panel sits between the week trail and the sync panel — one switch and one time picker per pillar (Workout, Food, Learning, Savings), each independent. Arm any of them, grant the browser permission when prompted, and each armed pillar pings you once at its own time — only if that specific pillar is still undone. Defaults are 7am workout, 1pm food, 6pm learning, 9pm savings, but every time is editable. It's fully on-device:
@@ -105,7 +89,6 @@ Roughly in order of how much value they'd add for the effort:
 - **Cross-device sync** — the README already documents a Google Sheets/Apps Script path (`apps-script/Code.gs`); wiring `loadState`/`saveState` in `useTracker.js` to it is the only change needed.
 - **Goals & milestones** — e.g. "30-day workout streak" as a named goal with its own progress bar and a small badge on completion.
 - **Weekly email/WhatsApp digest** — send the same data that powers the 7-day PDF report as a scheduled message (would need a small backend, e.g. the same Apps Script pattern).
-- **Multiple photo history, not just today's** — a small gallery per pillar instead of one photo slot, so the snapshot panel becomes a visual log over time.
 - **Dark/light theme toggle** — keep this HUD look as one theme and offer the original warm "Tend" look as an alternate, switchable in one tap.
 - **Import** to complement the JSON backup export — restore from a previously downloaded backup file.
 

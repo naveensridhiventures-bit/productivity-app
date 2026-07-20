@@ -38,8 +38,6 @@ const STATE_SHEET = 'State'
 const DAYS_SHEET = 'Days'
 const STATE_KEY = 'tend_state'
 
-const PILLAR_IDS = ['workout', 'food', 'learning', 'savings']
-
 function setup() {
   const ss = SpreadsheetApp.getActiveSpreadsheet()
 
@@ -51,9 +49,10 @@ function setup() {
   let days = ss.getSheetByName(DAYS_SHEET)
   if (!days) days = ss.insertSheet(DAYS_SHEET)
   days.clear()
-  days.getRange(1, 1, 1, 7).setValues([
-    ['date', 'workout_%', 'food_%', 'learning_%', 'savings_%', 'tasks_done', 'tasks_total'],
-  ])
+  // Just a starter header — rebuildDaysTab_ rewrites this every sync using
+  // whatever categories are actually in the synced state, since categories
+  // are user-editable now (add/rename/delete) rather than a fixed four.
+  days.getRange(1, 1, 1, 3).setValues([['date', 'tasks_done', 'tasks_total']])
 }
 
 function getStateSheet_() {
@@ -79,30 +78,40 @@ function pillarRatio_(counts) {
   return sum / ids.length
 }
 
-// Rebuild the human-readable Days tab from the full state blob.
+// Rebuild the human-readable Days tab from the full state blob. Columns are
+// built dynamically from state.categories, since categories are now
+// user-editable (add/rename/delete) rather than a fixed four — falls back
+// to whatever pillar ids show up in the data if `categories` isn't present
+// (older synced states, before categories became dynamic).
 function rebuildDaysTab_(state) {
   const sheet = getDaysSheet_()
   if (!sheet) return
   const days = state.days || {}
   const dates = Object.keys(days).sort()
+
+  let categories = state.categories
+  if (!categories || categories.length === 0) {
+    const ids = {}
+    dates.forEach((d) => {
+      const pillars = (days[d] && days[d].pillars) || {}
+      Object.keys(pillars).forEach((id) => { ids[id] = true })
+    })
+    categories = Object.keys(ids).map((id) => ({ id: id, label: id }))
+  }
+
+  const headers = ['date'].concat(categories.map((c) => (c.label || c.id) + '_%'), ['tasks_done', 'tasks_total'])
+  sheet.clear()
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers])
+
   const rows = dates.map((date) => {
     const rec = days[date] || {}
     const pillars = rec.pillars || {}
-    const pct = (id) => Math.round(pillarRatio_(pillars[id] && pillars[id].counts) * 100)
+    const pcts = categories.map((c) => Math.round(pillarRatio_(pillars[c.id] && pillars[c.id].counts) * 100))
     const tasks = rec.tasks || []
-    return [
-      date,
-      pct('workout'),
-      pct('food'),
-      pct('learning'),
-      pct('savings'),
-      tasks.filter((t) => t.done).length,
-      tasks.length,
-    ]
+    return [date].concat(pcts, [tasks.filter((t) => t.done).length, tasks.length])
   })
-  sheet.getRange(2, 1, Math.max(sheet.getMaxRows() - 1, 1), 7).clearContent()
   if (rows.length > 0) {
-    sheet.getRange(2, 1, rows.length, 7).setValues(rows)
+    sheet.getRange(2, 1, rows.length, headers.length).setValues(rows)
   }
 }
 

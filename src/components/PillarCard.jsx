@@ -82,6 +82,7 @@ export default function PillarCard({
   onSetCount,
   onAddSubItem,
   onRemoveSubItem,
+  onUpdateSubItem,
   onEditCategory,
   onRemoveCategory,
 }) {
@@ -93,6 +94,10 @@ export default function PillarCard({
   const [editingCategory, setEditingCategory] = useState(false)
   const [labelDraft, setLabelDraft] = useState(pillar.label)
   const [taglineDraft, setTaglineDraft] = useState(pillar.tagline)
+  const [editingItemId, setEditingItemId] = useState(null)
+  const [itemLabelDraft, setItemLabelDraft] = useState('')
+  const [itemUnitDraft, setItemUnitDraft] = useState('')
+  const [itemTargetDraft, setItemTargetDraft] = useState('')
 
   const { ratio, done, items, counts } = progress
   const pct = Math.round(ratio * 100)
@@ -124,6 +129,31 @@ export default function PillarCard({
   function confirmDeleteCategory() {
     if (window.confirm(`Delete the "${pillar.label}" category? Its logged history stays saved, but it'll stop appearing here.`)) {
       onRemoveCategory()
+    }
+  }
+
+  function startEditItem(item) {
+    setEditingItemId(item.id)
+    setItemLabelDraft(item.label)
+    setItemUnitDraft(item.unit || '')
+    setItemTargetDraft(String(item.target))
+  }
+
+  function saveItemEdit(e, itemId) {
+    e.preventDefault()
+    const label = itemLabelDraft.trim()
+    if (!label) return
+    onUpdateSubItem(itemId, {
+      label,
+      unit: itemUnitDraft.trim(),
+      target: Number(itemTargetDraft) || 1,
+    })
+    setEditingItemId(null)
+  }
+
+  function confirmDeleteItem(item) {
+    if (window.confirm(`Remove "${item.label}" from ${pillar.label}? Logged history for it stays saved.`)) {
+      onRemoveSubItem(item.id)
     }
   }
 
@@ -200,6 +230,40 @@ export default function PillarCard({
               const count = counts?.[item.id] || 0
               const itemPct = Math.min(100, Math.round((count / (item.target || 1)) * 100))
               const isChecklist = item.target === 1 && item.step === 1 && !item.unit
+
+              if (editingItemId === item.id) {
+                return (
+                  <li key={item.id} className="subitem-row subitem-row-editing">
+                    <form className="subitem-edit-form" onSubmit={(e) => saveItemEdit(e, item.id)}>
+                      <input
+                        type="text"
+                        value={itemLabelDraft}
+                        onChange={(e) => setItemLabelDraft(e.target.value)}
+                        placeholder="Name"
+                        autoFocus
+                      />
+                      <input
+                        type="number"
+                        inputMode="decimal"
+                        value={itemTargetDraft}
+                        onChange={(e) => setItemTargetDraft(e.target.value)}
+                        placeholder="target"
+                      />
+                      <input
+                        type="text"
+                        value={itemUnitDraft}
+                        onChange={(e) => setItemUnitDraft(e.target.value)}
+                        placeholder="unit"
+                      />
+                      <button type="submit" className="add-btn small">Save</button>
+                      <button type="button" className="cancel-btn" onClick={() => setEditingItemId(null)}>
+                        Cancel
+                      </button>
+                    </form>
+                  </li>
+                )
+              }
+
               return (
                 <li key={item.id} className={`subitem-row ${count >= item.target ? 'is-complete' : ''}`}>
                   <div className="subitem-info">
@@ -244,15 +308,24 @@ export default function PillarCard({
                     <div className="subitem-mini-fill" style={{ width: `${itemPct}%` }} />
                   </div>
 
-                  {item.custom ? (
+                  <div className="subitem-manage">
+                    <button
+                      className="subitem-edit-btn"
+                      onClick={() => startEditItem(item)}
+                      aria-label={`Edit ${item.label}`}
+                      title="Edit"
+                    >
+                      ✎
+                    </button>
                     <button
                       className="subitem-remove"
-                      onClick={() => onRemoveSubItem(item.id)}
+                      onClick={() => confirmDeleteItem(item)}
                       aria-label={`Remove ${item.label}`}
+                      title="Delete"
                     >
                       ×
                     </button>
-                  ) : null}
+                  </div>
                 </li>
               )
             })}
