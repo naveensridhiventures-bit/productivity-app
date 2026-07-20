@@ -42,6 +42,32 @@ const ICONS = {
       <circle cx="15.5" cy="10.5" r="0.9" fill="currentColor" stroke="none" />
     </>
   ),
+  star: (
+    <path
+      d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.9-5.2-2.8-5.2 2.8 1-5.9-4.3-4.1 5.9-.8L12 3.5z"
+      fill="none"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  ),
+  flag: (
+    <path
+      d="M5 3v18M5 4h11l-2.5 3.5L16 11H5"
+      fill="none"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  ),
+  bolt: (
+    <path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+  ),
+  target: (
+    <>
+      <circle cx="12" cy="12" r="8" fill="none" />
+      <circle cx="12" cy="12" r="4.5" fill="none" />
+      <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
+    </>
+  ),
 }
 
 function formatCount(n) {
@@ -56,12 +82,17 @@ export default function PillarCard({
   onSetCount,
   onAddSubItem,
   onRemoveSubItem,
+  onEditCategory,
+  onRemoveCategory,
 }) {
   const [expanded, setExpanded] = useState(false)
   const [adding, setAdding] = useState(false)
   const [newLabel, setNewLabel] = useState('')
   const [newTarget, setNewTarget] = useState('')
   const [newUnit, setNewUnit] = useState('')
+  const [editingCategory, setEditingCategory] = useState(false)
+  const [labelDraft, setLabelDraft] = useState(pillar.label)
+  const [taglineDraft, setTaglineDraft] = useState(pillar.tagline)
 
   const { ratio, done, items, counts } = progress
   const pct = Math.round(ratio * 100)
@@ -80,6 +111,20 @@ export default function PillarCard({
     setNewTarget('')
     setNewUnit('')
     setAdding(false)
+  }
+
+  function saveCategoryEdit(e) {
+    e.preventDefault()
+    const label = labelDraft.trim()
+    if (!label) return
+    onEditCategory({ label, tagline: taglineDraft.trim() })
+    setEditingCategory(false)
+  }
+
+  function confirmDeleteCategory() {
+    if (window.confirm(`Delete the "${pillar.label}" category? Its logged history stays saved, but it'll stop appearing here.`)) {
+      onRemoveCategory()
+    }
   }
 
   return (
@@ -102,6 +147,18 @@ export default function PillarCard({
         <div className="pillar-side">
           {streak > 0 ? <span className="streak-badge mono">🔥{streak}d</span> : null}
           <span className="pillar-pct mono">{pct}%</span>
+          <button
+            className="pillar-manage-btn"
+            onClick={(e) => {
+              e.stopPropagation()
+              setExpanded(true)
+              setEditingCategory((v) => !v)
+            }}
+            aria-label={`Manage ${pillar.label} category`}
+            title="Rename or delete this category"
+          >
+            ⚙
+          </button>
         </div>
       </div>
 
@@ -111,6 +168,33 @@ export default function PillarCard({
 
       {expanded ? (
         <div className="pillar-detail">
+          {editingCategory ? (
+            <form className="category-edit-form" onSubmit={saveCategoryEdit}>
+              <input
+                type="text"
+                value={labelDraft}
+                onChange={(e) => setLabelDraft(e.target.value)}
+                placeholder="Category name"
+                autoFocus
+              />
+              <input
+                type="text"
+                value={taglineDraft}
+                onChange={(e) => setTaglineDraft(e.target.value)}
+                placeholder="Tagline"
+              />
+              <div className="category-edit-actions">
+                <button type="submit" className="add-btn small">Save</button>
+                <button type="button" className="cancel-btn" onClick={() => setEditingCategory(false)}>
+                  Cancel
+                </button>
+                <button type="button" className="category-delete-btn" onClick={confirmDeleteCategory}>
+                  Delete category
+                </button>
+              </div>
+            </form>
+          ) : null}
+
           <ul className="subitem-list">
             {items.map((item) => {
               const count = counts?.[item.id] || 0

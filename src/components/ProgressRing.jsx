@@ -1,13 +1,10 @@
-import { PILLARS } from '../data/defaultTasks'
-
 const SIZE = 200
 const STROKE = 9
 const R = (SIZE - STROKE) / 2
 const CIRC = 2 * Math.PI * R
-const BUD_ANGLES = [-90, 0, 90, 180] // top, right, bottom, left
 const DECOR_R = R + 14
 
-export default function ProgressRing({ ratio, pillarsDone, dayLabel }) {
+export default function ProgressRing({ ratio, pillarsDone, dayLabel, categories = [] }) {
   const offset = CIRC * (1 - ratio)
   const tickCount = 60
 
@@ -55,8 +52,8 @@ export default function ProgressRing({ ratio, pillarsDone, dayLabel }) {
           transform={`rotate(-90 ${SIZE / 2} ${SIZE / 2})`}
           style={{ transition: 'stroke-dashoffset 0.5s ease' }}
         />
-        {PILLARS.map((pillar, i) => {
-          const angle = (BUD_ANGLES[i] * Math.PI) / 180
+        {categories.map((pillar, i) => {
+          const angle = ((i / Math.max(categories.length, 1)) * 360 - 90) * (Math.PI / 180)
           const bx = SIZE / 2 + R * Math.cos(angle)
           const by = SIZE / 2 + R * Math.sin(angle)
           const isDone = pillarsDone.includes(pillar.id)

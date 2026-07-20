@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { PILLARS } from '../data/defaultTasks'
 import {
   exportDailyReport,
   exportPillarReport,
@@ -24,6 +23,7 @@ function mondayOf(d) {
 }
 
 export default function Reports({
+  categories,
   pillarProgress,
   itemsForPillar,
   streaks,
@@ -68,12 +68,12 @@ export default function Reports({
         <div className="reports-grid">
           <button
             className="report-btn report-btn-full"
-            onClick={() => exportDailyReport({ pillarProgress, itemsForPillar, streaks, today, completion })}
+            onClick={() => exportDailyReport({ categories, pillarProgress, itemsForPillar, streaks, today, completion })}
           >
             ⬇ Full daily report (PDF)
           </button>
 
-          {PILLARS.map((pillar) => (
+          {categories.map((pillar) => (
             <button
               key={pillar.id}
               className="report-btn"
@@ -93,7 +93,7 @@ export default function Reports({
 
           <button
             className="report-btn"
-            onClick={() => exportWeeklyReport({ history, itemsForPillar, weekTrail })}
+            onClick={() => exportWeeklyReport({ categories, history, itemsForPillar, weekTrail })}
           >
             <span>7-day rollup</span>
             <span className="report-icon mono">↓</span>
@@ -135,7 +135,7 @@ export default function Reports({
           <button
             type="button"
             className="add-btn range-download-btn"
-            onClick={() => exportRangeReport({ history, itemsForPillar, from, to })}
+            onClick={() => exportRangeReport({ categories, history, itemsForPillar, from, to })}
           >
             ⬇ Download PDF for this range
           </button>

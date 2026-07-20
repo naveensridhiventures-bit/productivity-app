@@ -1,5 +1,4 @@
 import { jsPDF } from 'jspdf'
-import { PILLARS } from '../data/defaultTasks'
 
 const INK = [16, 24, 32]
 const CORE = [15, 130, 168]
@@ -144,7 +143,7 @@ function footer(doc) {
 // ---- report builders -----------------------------------------------------
 
 /** Full report: every pillar + every sub-category + today's tasks. */
-export function exportDailyReport({ pillarProgress, itemsForPillar, streaks, today, completion }) {
+export function exportDailyReport({ categories, pillarProgress, itemsForPillar, streaks, today, completion }) {
   const { doc, pageWidth } = newDoc('Full Daily Report', fmtDate())
   let y = 100
   const x = 40
@@ -155,7 +154,7 @@ export function exportDailyReport({ pillarProgress, itemsForPillar, streaks, tod
   y = keyValRow(doc, 'Tasks completed', `${completion.tasksDone} / ${completion.tasksTotal}`, x, y, 220)
   y += 10
 
-  for (const pillar of PILLARS) {
+  for (const pillar of categories) {
     const progress = pillarProgress[pillar.id]
     const items = itemsForPillar(pillar.id)
     if (y > 680) { doc.addPage(); y = 60 }
@@ -205,7 +204,7 @@ export function exportPillarReport(pillar, progress, streak, items) {
 }
 
 /** 7-day rollup across all pillars, using the tracker's raw history object. */
-export function exportWeeklyReport({ history, itemsForPillar, weekTrail }) {
+export function exportWeeklyReport({ categories, history, itemsForPillar, weekTrail }) {
   const { doc, pageWidth } = newDoc('7-Day Report', fmtDate())
   let y = 100
   const x = 40
@@ -218,12 +217,12 @@ export function exportWeeklyReport({ history, itemsForPillar, weekTrail }) {
     doc.setTextColor(...MUTED)
     doc.text(day.key, x, y)
     doc.setTextColor(...INK)
-    doc.text(`${day.doneCount} / ${PILLARS.length} pillars complete${day.isToday ? '  (today)' : ''}`, x + 120, y)
+    doc.text(`${day.doneCount} / ${categories.length} categories complete${day.isToday ? '  (today)' : ''}`, x + 120, y)
     y += 15
   }
   y += 10
 
-  for (const pillar of PILLARS) {
+  for (const pillar of categories) {
     if (y > 650) { doc.addPage(); y = 60 }
     y = sectionHeading(doc, `${pillar.label} — 7-day sub-category totals`, x, y)
     const items = itemsForPillar(pillar.id)
@@ -256,7 +255,7 @@ export function exportWeeklyReport({ history, itemsForPillar, weekTrail }) {
  * whatever `from`/`to` cover. Same shape as the 7-day rollup, just not
  * pinned to "the last 7 days".
  */
-export function exportRangeReport({ history, itemsForPillar, from, to }) {
+export function exportRangeReport({ categories, history, itemsForPillar, from, to }) {
   const keys = dateRangeKeys(from, to)
   const single = keys.length === 1
   const title = single ? `Daily Report — ${from}` : `Report — ${from} to ${to}`
@@ -277,7 +276,7 @@ export function exportRangeReport({ history, itemsForPillar, from, to }) {
       doc.addPage()
       y = 60
     }
-    const doneCount = PILLARS.filter(
+    const doneCount = categories.filter(
       (p) => pillarRatioLocal(itemsForPillar(p.id), rec.pillars?.[p.id]?.counts) >= 1
     ).length
     const tasks = rec.tasks || []
@@ -285,7 +284,7 @@ export function exportRangeReport({ history, itemsForPillar, from, to }) {
     doc.text(key, x, y)
     doc.setTextColor(...INK)
     doc.text(
-      `${doneCount}/${PILLARS.length} pillars · ${tasks.filter((t) => t.done).length}/${tasks.length} tasks`,
+      `${doneCount}/${categories.length} categories · ${tasks.filter((t) => t.done).length}/${tasks.length} tasks`,
       x + 120,
       y
     )
@@ -299,7 +298,7 @@ export function exportRangeReport({ history, itemsForPillar, from, to }) {
   }
   y += 10
 
-  for (const pillar of PILLARS) {
+  for (const pillar of categories) {
     if (y > 650) {
       doc.addPage()
       y = 60

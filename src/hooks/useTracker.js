@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { PILLARS, DEFAULT_SUB_ITEMS, SEED_TASKS, DAILY_QUOTES } from '../data/defaultTasks'
+import { DEFAULT_CATEGORIES, DEFAULT_SUB_ITEMS, SEED_TASKS, DAILY_QUOTES } from '../data/defaultTasks'
 import { getSyncUrl, setSyncUrl, fetchRemoteState, pushRemoteState } from '../lib/sheetSync'
 
 // Bumped from v1 -> v2: pillars moved from a single done/note flag to
@@ -31,9 +31,9 @@ function todayKey(d = new Date()) {
   return `${y}-${m}-${day}`
 }
 
-function emptyPillars() {
+function emptyPillars(categories) {
   const p = {}
-  for (const pillar of PILLARS) {
+  for (const pillar of categories) {
     p[pillar.id] = { counts: {} }
   }
   return p
@@ -42,11 +42,20 @@ function emptyPillars() {
 function loadState() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return JSON.parse(raw)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      // v2 data had no user-editable categories — seed them in place so
+      // existing history keeps working with the new dynamic-categories UI.
+      if (!parsed.categories || parsed.categories.length === 0) {
+        parsed.categories = DEFAULT_CATEGORIES
+      }
+      return parsed
+    }
   } catch (e) {
     console.warn('Failed to load tracker state', e)
   }
   return {
+    categories: DEFAULT_CATEGORIES,
     recurringTasks: SEED_TASKS.map(({ id, text }) => ({ id, text })),
     subItemsConfig: {}, // pillarId -> array of custom sub-items (defaults merged in at read time)
     days: {},
@@ -69,7 +78,8 @@ function saveState(state) {
 // Merge default sub-items with any custom ones the user has added for a pillar.
 function subItemsFor(pillarId, subItemsConfig) {
   const custom = subItemsConfig?.[pillarId] || []
-  return [...DEFAULT_SUB_ITEMS[pillarId], ...custom]
+  const defaults = DEFAULT_SUB_ITEMS[pillarId] || []
+  return [...defaults, ...custom]
 }
 
 // A sub-item's own progress, clamped 0..1.
@@ -96,6 +106,7 @@ function pillarRatio(items, counts) {
 export function useTracker() {
   const [state, setState] = useState(loadState)
   const key = todayKey()
+  const categories = state.categories && state.categories.length ? state.categories : DEFAULT_CATEGORIES
 
   // ---- Google Sheets sync (optional) ----
   // Everything still works fully offline on localStorage. If a sync URL is
@@ -219,28 +230,28 @@ export function useTracker() {
         ...prev,
         days: {
           ...prev.days,
-          [key]: { pillars: emptyPillars(), tasks: seededTasks },
+          [key]: { pillars: emptyPillars(categories), tasks: seededTasks },
         },
       }
     })
   }, [key])
 
-  const today = state.days[key] || { pillars: emptyPillars(), tasks: [] }
+  const today = state.days[key] || { pillars: emptyPillars(categories), tasks: [] }
   const subItemsConfig = state.subItemsConfig || {}
 
   const pillarItems = useMemo(() => {
     const map = {}
-    for (const pillar of PILLARS) {
+    for (const pillar of categories) {
       map[pillar.id] = subItemsFor(pillar.id, subItemsConfig)
     }
     return map
-  }, [subItemsConfig])
+  }, [subItemsConfig, categories])
 
   // Set an exact count for one sub-item within a pillar, today.
   const setSubCount = useCallback(
     (pillarId, subId, count) => {
       setState((prev) => {
-        const day = prev.days[key] || { pillars: emptyPillars(), tasks: [] }
+        const day = prev.days[key] || { pillars: emptyPillars(categories), tasks: [] }
         const pillar = day.pillars[pillarId] || { counts: {} }
         const clamped = Math.max(0, Math.round(count * 100) / 100)
         return {
@@ -265,7 +276,7 @@ export function useTracker() {
   const bumpSubCount = useCallback(
     (pillarId, subId, delta) => {
       setState((prev) => {
-        const day = prev.days[key] || { pillars: emptyPillars(), tasks: [] }
+        const day = prev.days[key] || { pillars: emptyPillars(categories), tasks: [] }
         const pillar = day.pillars[pillarId] || { counts: {} }
         const current = pillar.counts?.[subId] || 0
         const next = Math.max(0, Math.round((current + delta) * 100) / 100)
@@ -339,11 +350,59 @@ export function useTracker() {
     })
   }, [])
 
+  // Add a brand-new main category (e.g. "Meditation"). Starts with no
+  // sub-items — the person builds it out with "+ Add sub-category" just
+  // like the defaults.
+  const addCategory = useCallback(({ label, tagline, icon, accent }) => {
+    const id = `cat-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`
+    setState((prev) => {
+      const base = prev.categories && prev.categories.length ? prev.categories : DEFAULT_CATEGORIES
+      return {
+        ...prev,
+        categories: [
+          ...base,
+          {
+            id,
+            label: label || 'New category',
+            tagline: tagline || '',
+            icon: icon || 'star',
+            accent: accent || 'core',
+            custom: true,
+          },
+        ],
+      }
+    })
+    return id
+  }, [])
+
+  // Rename / restyle any category, default or custom.
+  const updateCategory = useCallback((categoryId, patch) => {
+    setState((prev) => {
+      const base = prev.categories && prev.categories.length ? prev.categories : DEFAULT_CATEGORIES
+      return {
+        ...prev,
+        categories: base.map((c) => (c.id === categoryId ? { ...c, ...patch } : c)),
+      }
+    })
+  }, [])
+
+  // Remove a category entirely (default or custom). Past logged history for
+  // it stays in storage untouched — it just stops appearing going forward.
+  const removeCategory = useCallback((categoryId) => {
+    setState((prev) => {
+      const base = prev.categories && prev.categories.length ? prev.categories : DEFAULT_CATEGORIES
+      return {
+        ...prev,
+        categories: base.filter((c) => c.id !== categoryId),
+      }
+    })
+  }, [])
+
   const addTask = useCallback(
     (text, recurring) => {
       const id = `t-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
       setState((prev) => {
-        const day = prev.days[key] || { pillars: emptyPillars(), tasks: [] }
+        const day = prev.days[key] || { pillars: emptyPillars(categories), tasks: [] }
         const newTask = { id, text, done: false, recurring: !!recurring }
         const nextRecurring = recurring
           ? [...prev.recurringTasks, { id, text }]
@@ -364,7 +423,7 @@ export function useTracker() {
   const toggleTask = useCallback(
     (taskId) => {
       setState((prev) => {
-        const day = prev.days[key] || { pillars: emptyPillars(), tasks: [] }
+        const day = prev.days[key] || { pillars: emptyPillars(categories), tasks: [] }
         return {
           ...prev,
           days: {
@@ -385,7 +444,7 @@ export function useTracker() {
   const removeTask = useCallback(
     (taskId) => {
       setState((prev) => {
-        const day = prev.days[key] || { pillars: emptyPillars(), tasks: [] }
+        const day = prev.days[key] || { pillars: emptyPillars(categories), tasks: [] }
         return {
           ...prev,
           recurringTasks: prev.recurringTasks.filter((t) => t.id !== taskId),
@@ -413,7 +472,7 @@ export function useTracker() {
   // Today's ratio (0..1) and done flag per pillar, calculated from sub-items.
   const pillarProgress = useMemo(() => {
     const result = {}
-    for (const pillar of PILLARS) {
+    for (const pillar of categories) {
       const items = effectiveItems(pillar.id)
       const counts = today.pillars[pillar.id]?.counts || {}
       const ratio = pillarRatio(items, counts)
@@ -425,7 +484,7 @@ export function useTracker() {
   // Consecutive days (ending today or yesterday) a pillar was fully completed.
   const streaks = useMemo(() => {
     const result = {}
-    for (const pillar of PILLARS) {
+    for (const pillar of categories) {
       const items = effectiveItems(pillar.id)
       let count = 0
       let cursor = new Date()
@@ -449,15 +508,15 @@ export function useTracker() {
   }, [state.days, pillarProgress, effectiveItems])
 
   const completion = useMemo(() => {
-    const pillarsDone = PILLARS.filter((p) => pillarProgress[p.id].done).length
-    const pillarRatioSum = PILLARS.reduce((sum, p) => sum + pillarProgress[p.id].ratio, 0)
+    const pillarsDone = categories.filter((p) => pillarProgress[p.id].done).length
+    const pillarRatioSum = categories.reduce((sum, p) => sum + pillarProgress[p.id].ratio, 0)
     const tasksTotal = today.tasks.length
     const tasksDone = today.tasks.filter((t) => t.done).length
-    const totalUnits = PILLARS.length + tasksTotal
+    const totalUnits = categories.length + tasksTotal
     const doneUnits = pillarRatioSum + tasksDone
     return {
       pillarsDone,
-      pillarsTotal: PILLARS.length,
+      pillarsTotal: categories.length,
       tasksDone,
       tasksTotal,
       ratio: totalUnits === 0 ? 0 : doneUnits / totalUnits,
@@ -473,7 +532,7 @@ export function useTracker() {
       const k = todayKey(d)
       const rec = state.days[k]
       const doneCount = rec
-        ? PILLARS.filter((p) => pillarRatio(effectiveItems(p.id), rec.pillars[p.id]?.counts) >= 1).length
+        ? categories.filter((p) => pillarRatio(effectiveItems(p.id), rec.pillars[p.id]?.counts) >= 1).length
         : 0
       days.push({ key: k, isToday: k === key, doneCount })
     }
@@ -485,14 +544,14 @@ export function useTracker() {
     return DAILY_QUOTES[dayIndex % DAILY_QUOTES.length]
   }, [])
 
-  const allPillarsDone = PILLARS.every((p) => pillarProgress[p.id].done)
+  const allPillarsDone = categories.every((p) => pillarProgress[p.id].done)
 
   // Attach a photo (e.g. a Cloudinary URL) to a pillar for today. Used by
   // the "Daily Snapshot" panel — purely optional visual evidence per pillar.
   const setPillarPhoto = useCallback(
     (pillarId, photo) => {
       setState((prev) => {
-        const day = prev.days[key] || { pillars: emptyPillars(), tasks: [] }
+        const day = prev.days[key] || { pillars: emptyPillars(categories), tasks: [] }
         const pillar = day.pillars[pillarId] || { counts: {} }
         return {
           ...prev,
@@ -520,6 +579,10 @@ export function useTracker() {
   return {
     today,
     todayKey: key,
+    categories,
+    addCategory,
+    updateCategory,
+    removeCategory,
     pillarProgress,
     setSubCount,
     bumpSubCount,

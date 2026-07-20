@@ -1,5 +1,4 @@
 import { useRef, useState } from 'react'
-import { PILLARS } from '../data/defaultTasks'
 import {
   isCloudinaryConfigured,
   uploadToCloudinary,
@@ -8,8 +7,8 @@ import {
   EDIT_PRESETS,
 } from '../lib/cloudinary'
 
-export default function Snapshot({ today, setPillarPhoto }) {
-  const [activePillar, setActivePillar] = useState(PILLARS[0].id)
+export default function Snapshot({ today, setPillarPhoto, categories }) {
+  const [activePillar, setActivePillar] = useState(categories[0]?.id || null)
   const [remoteUrl, setRemoteUrl] = useState('')
   const [editId, setEditId] = useState('none')
   const [status, setStatus] = useState(null) // { kind: 'ok'|'error', text }
@@ -59,7 +58,7 @@ export default function Snapshot({ today, setPillarPhoto }) {
         ) : null}
 
         <div className="snapshot-pillar-picker">
-          {PILLARS.map((p) => (
+          {categories.map((p) => (
             <button
               key={p.id}
               className={`snapshot-pillar-chip ${activePillar === p.id ? 'is-active' : ''}`}

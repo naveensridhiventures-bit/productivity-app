@@ -22,7 +22,7 @@ export default function Header() {
     <header className="app-header hud-panel">
       <div>
         <p className="eyebrow mono">J.A.R.V.I.S. // {date}</p>
-        <h1>{greeting()}, Iqshaana</h1>
+        <h1>{greeting()}, Naveen</h1>
         <p className="sub-line">All pillars monitored · Data stored on-device</p>
       </div>
       <div className="mark" aria-hidden="true">

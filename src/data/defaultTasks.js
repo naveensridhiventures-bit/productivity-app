@@ -1,8 +1,12 @@
-// The four core pillars — always present, tracked daily.
-// Each pillar is made up of sub-items (exercises, meals, topics, goals).
-// A pillar's completion is calculated automatically from its sub-items —
-// hit every target and the pillar marks itself done.
-export const PILLARS = [
+// The starter categories — seeded on first run, tracked daily.
+// Each category is made up of sub-items (exercises, meals, topics, goals).
+// A category's completion is calculated automatically from its sub-items —
+// hit every target and the category marks itself done.
+// From v3 onward these are just the *default seed*: the person can rename,
+// delete, or add their own categories at runtime (see useTracker's
+// addCategory/updateCategory/removeCategory) — the full list lives in
+// state.categories, not here.
+export const DEFAULT_CATEGORIES = [
   {
     id: 'workout',
     label: 'Workout',
@@ -32,6 +36,13 @@ export const PILLARS = [
     icon: 'piggy',
   },
 ]
+
+// Kept for anything that still imports the old name.
+export const PILLARS = DEFAULT_CATEGORIES
+
+// Choices offered in the "add / edit category" form.
+export const ICON_OPTIONS = ['dumbbell', 'bowl', 'book', 'piggy', 'star', 'flag', 'bolt', 'target']
+export const ACCENT_OPTIONS = ['clay', 'gold', 'sky', 'moss', 'core']
 
 // Default sub-items per pillar. Each has a target and a step size used by
 // the +/- stepper. Users can also add their own custom sub-items — those

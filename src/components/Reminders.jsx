@@ -1,6 +1,4 @@
-import { PILLARS } from '../data/defaultTasks'
-
-export default function Reminders({ settings, updatePillar, permission, requestPermission, sendTest, supported }) {
+export default function Reminders({ categories, settings, updatePillar, permission, requestPermission, sendTest, supported }) {
   const granted = permission === 'granted'
   const denied = permission === 'denied'
   const anyEnabled = Object.values(settings.pillars).some((p) => p.enabled)
@@ -23,7 +21,7 @@ export default function Reminders({ settings, updatePillar, permission, requestP
           </p>
         ) : (
           <>
-            {PILLARS.map((pillar) => {
+            {categories.filter((p) => settings.pillars[p.id]).map((pillar) => {
               const cfg = settings.pillars[pillar.id]
               return (
                 <div className="reminders-row" key={pillar.id}>
